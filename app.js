@@ -24,7 +24,7 @@ const settings = {
   color: '#00e5ff',
 };
 
-const APP_VERSION = 'v7';
+const APP_VERSION = 'v8';
 
 const tracker = new PlaneTracker();
 let mode = 'screen';     // 'screen' (Phase 1) | 'locked' (Phase 2)

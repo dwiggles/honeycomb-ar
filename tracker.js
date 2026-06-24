@@ -221,6 +221,18 @@ class PlaneTracker {
           const a = this._alphaFor(d);
           for (let k = 0; k < 9; k++) this.lastH[k] += a * (this.rawH[k] - this.lastH[k]);
         }
+        // Evict points that disagree with the planar fit (RANSAC outliers).
+        // Inconsistent features — e.g. re-seeded mid-motion with a slightly off
+        // plane anchor — would otherwise linger and make RANSAC flip-flop,
+        // causing edge jitter that persists even at rest. Pruning them lets the
+        // set reconverge so the jitter stops on its own.
+        if (mask.rows === this.ref.length) {
+          const keepRef = [], keepCur = [];
+          for (let k = 0; k < mask.rows; k++) {
+            if (mask.data[k]) { keepRef.push(this.ref[k]); keepCur.push(this.cur[k]); }
+          }
+          if (keepRef.length >= 8) { this.ref = keepRef; this.cur = keepCur; }
+        }
       }
       srcM.delete(); dstM.delete(); mask.delete(); Hmat.delete();
     }
