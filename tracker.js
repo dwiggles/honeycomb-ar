@@ -46,7 +46,8 @@ class PlaneTracker {
   constructor() {
     this.ready = false;     // OpenCV runtime initialized
     this.tracking = false;  // currently locked + tracking a plane
-    this.lastH = identity3();
+    this.lastH = identity3();  // smoothed homography (used for rendering)
+    this.rawH = identity3();   // unsmoothed homography (used for re-seeding)
     this.procW = 0;
     this.procH = 0;
     this.procScale = 1;     // procPixels / videoPixels
@@ -111,8 +112,19 @@ class PlaneTracker {
     this.cur = pts.map((p) => ({ x: p.x, y: p.y }));
     this.prevGray = gray;
     this.lastH = identity3();
+    this.rawH = identity3();
     this.tracking = true;
     return true;
+  }
+
+  // Adaptive smoothing factor: heavy at rest, responsive when moving.
+  // motion is the mean per-frame point displacement in proc px.
+  _alphaFor(motion) {
+    const LO = 0.6, HI = 3.0;       // proc px/frame
+    const A_MIN = 0.15, A_MAX = 1.0; // smoothing strength -> none
+    if (motion <= LO) return A_MIN;
+    if (motion >= HI) return A_MAX;
+    return A_MIN + (A_MAX - A_MIN) * (motion - LO) / (HI - LO);
   }
 
   unlock() {
@@ -142,15 +154,20 @@ class PlaneTracker {
     cv.calcOpticalFlowPyrLK(this.prevGray, gray, prevPts, nextPts, status, err, winSize, 2, criteria);
 
     const newRef = [], newCur = [];
+    let motionSum = 0, motionN = 0;
     for (let k = 0; k < status.rows; k++) {
       if (status.data[k] === 1) {
         const x = nextPts.data32F[k * 2], y = nextPts.data32F[k * 2 + 1];
         if (x >= 0 && y >= 0 && x < this.procW && y < this.procH) {
+          const dx = x - this.cur[k].x, dy = y - this.cur[k].y;
+          motionSum += Math.hypot(dx, dy);
+          motionN++;
           newRef.push(this.ref[k]);
           newCur.push({ x, y });
         }
       }
     }
+    const motion = motionN ? motionSum / motionN : 0;
     prevPts.delete(); nextPts.delete(); status.delete(); err.delete();
 
     this.ref = newRef;
@@ -163,15 +180,18 @@ class PlaneTracker {
       const dstM = this._ptsToMat(this.cur);
       const mask = new cv.Mat();
       const Hmat = cv.findHomography(srcM, dstM, cv.RANSAC, 3, mask);
-      if (!Hmat.empty()) {
-        for (let k = 0; k < 9; k++) this.lastH[k] = Hmat.data64F[k];
+      if (!Hmat.empty() && Math.abs(Hmat.data64F[8]) > 1e-9) {
+        const s = Hmat.data64F[8]; // normalize so H[8] == 1 before blending
+        for (let k = 0; k < 9; k++) this.rawH[k] = Hmat.data64F[k] / s;
+        const a = this._alphaFor(motion);
+        for (let k = 0; k < 9; k++) this.lastH[k] += a * (this.rawH[k] - this.lastH[k]);
       }
       srcM.delete(); dstM.delete(); mask.delete(); Hmat.delete();
     }
 
     // Re-seed fresh features when the tracked set thins out.
     if (this.cur.length < this.minPts) {
-      const Hinv = invert3(this.lastH);
+      const Hinv = invert3(this.rawH);
       if (Hinv) {
         const mask = new cv.Mat(this.procH, this.procW, cv.CV_8UC1);
         mask.setTo(new cv.Scalar(255));
