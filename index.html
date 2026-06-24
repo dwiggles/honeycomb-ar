@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Honeycomb AR</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="start-screen">
+    <h1>Honeycomb AR</h1>
+    <p>Point your camera at a surface. We'll overlay a honeycomb grid of dots.</p>
+    <button id="start-btn">Start camera</button>
+    <p class="hint" id="error-msg"></p>
+  </div>
+
+  <div id="controls" class="hidden">
+    <button id="toggle-controls" aria-label="Toggle controls">⚙︎</button>
+    <div id="panel" class="hidden">
+      <label>Spacing
+        <input type="range" id="spacing" min="20" max="160" value="56" />
+      </label>
+      <label>Dot size
+        <input type="range" id="dot-size" min="1" max="12" value="3" />
+      </label>
+      <label>Opacity
+        <input type="range" id="opacity" min="10" max="100" value="85" />
+      </label>
+      <label>Color
+        <input type="color" id="color" value="#00e5ff" />
+      </label>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
