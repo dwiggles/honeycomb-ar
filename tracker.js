@@ -52,8 +52,10 @@ class PlaneTracker {
   constructor() {
     this.ready = false;     // OpenCV runtime initialized
     this.tracking = false;  // currently locked + tracking a plane
-    this.lastH = identity3();  // smoothed homography (used for rendering)
+    this.lastH = identity3();  // tracking homography (deadband-smoothed)
     this.rawH = identity3();   // unsmoothed homography (used for re-seeding)
+    this.dispH = identity3();  // render-only low-pass of lastH (calms shimmer)
+    this.renderBeta = 0.35;    // dispH follow rate; lower = smoother but more lag
     this.procW = 0;
     this.procH = 0;
     this.procScale = 1;     // procPixels / videoPixels
@@ -129,6 +131,7 @@ class PlaneTracker {
     this.prevGray = gray;
     this.lastH = identity3();
     this.rawH = identity3();
+    this.dispH = identity3();
     this.tracking = true;
     return true;
   }
@@ -313,6 +316,12 @@ class PlaneTracker {
         }
       }
     }
+
+    // Render-only low-pass: smooth the *displayed* transform to calm sub-pixel
+    // shimmer. This never feeds back into tracking/deadband/re-seed above, so
+    // accuracy and the at-rest freeze are untouched. At rest lastH is frozen,
+    // so dispH converges to it and goes still — no shimmer when stationary.
+    for (let k = 0; k < 9; k++) this.dispH[k] += this.renderBeta * (this.lastH[k] - this.dispH[k]);
 
     if (this.cur.length < 4) this.tracking = false;
     return this.tracking;

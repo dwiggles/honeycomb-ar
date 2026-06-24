@@ -24,7 +24,7 @@ const settings = {
   color: '#00e5ff',
 };
 
-const APP_VERSION = 'v9';
+const APP_VERSION = 'v10';
 
 const tracker = new PlaneTracker();
 let mode = 'screen';     // 'screen' (Phase 1) | 'locked' (Phase 2)
@@ -161,7 +161,7 @@ function buildGridRef() {
 
 // Draw the honeycomb warped through the tracked homography.
 function drawLocked() {
-  const H = tracker.lastH;
+  const H = tracker.dispH;
   const { factor, offX, offY, dispW, dispH } = displayMapping();
   ctx.globalAlpha = settings.opacity;
   ctx.strokeStyle = settings.color;
