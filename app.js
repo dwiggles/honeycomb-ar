@@ -17,8 +17,9 @@ const lockBtn = document.getElementById('lock-btn');
 const statusEl = document.getElementById('status');
 
 const settings = {
-  spacing: 56,   // distance between dots, in display px
-  dotSize: 3,    // dot radius, in display px
+  spacing: 56,    // distance between circles, in display px
+  dotSize: 6,     // circle radius, in display px
+  lineWidth: 1.5, // ring stroke width, in display px
   opacity: 0.85,
   color: '#00e5ff',
 };
@@ -102,14 +103,15 @@ function drawScreen() {
   const s = settings.spacing;
   const rowH = s * Math.sqrt(3) / 2;
   ctx.globalAlpha = settings.opacity;
-  ctx.fillStyle = settings.color;
+  ctx.strokeStyle = settings.color;
+  ctx.lineWidth = settings.lineWidth;
   let row = 0;
   for (let y = -s; y <= h + s; y += rowH) {
     const offset = (row % 2) * (s / 2);
     for (let x = -s; x <= w + s; x += s) {
       ctx.beginPath();
       ctx.arc(x + offset, y, settings.dotSize, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.stroke();
     }
     row++;
   }
@@ -140,7 +142,8 @@ function drawLocked() {
   const H = tracker.lastH;
   const { factor, offX, offY, dispW, dispH } = displayMapping();
   ctx.globalAlpha = settings.opacity;
-  ctx.fillStyle = settings.color;
+  ctx.strokeStyle = settings.color;
+  ctx.lineWidth = settings.lineWidth;
   for (const g of gridRef) {
     const w = H[6] * g.x + H[7] * g.y + H[8];
     if (w <= 0) continue;
@@ -151,7 +154,7 @@ function drawLocked() {
     if (sx < -20 || sy < -20 || sx > dispW + 20 || sy > dispH + 20) continue;
     ctx.beginPath();
     ctx.arc(sx, sy, settings.dotSize, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.stroke();
   }
 }
 
@@ -218,6 +221,9 @@ document.getElementById('spacing').addEventListener('input', (e) => {
 });
 document.getElementById('dot-size').addEventListener('input', (e) => {
   settings.dotSize = +e.target.value;
+});
+document.getElementById('line-width').addEventListener('input', (e) => {
+  settings.lineWidth = +e.target.value;
 });
 document.getElementById('opacity').addEventListener('input', (e) => {
   settings.opacity = e.target.value / 100;
