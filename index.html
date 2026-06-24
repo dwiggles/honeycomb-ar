@@ -20,6 +20,11 @@
     <p class="hint" id="error-msg"></p>
   </div>
 
+  <div id="lockbar" class="hidden">
+    <div id="status">Screen-locked</div>
+    <button id="lock-btn" disabled>Loading CV…</button>
+  </div>
+
   <div id="controls" class="hidden">
     <button id="toggle-controls" aria-label="Toggle controls">⚙︎</button>
     <div id="panel" class="hidden">
@@ -38,6 +43,8 @@
     </div>
   </div>
 
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+  <script src="tracker.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

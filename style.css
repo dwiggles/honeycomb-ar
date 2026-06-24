@@ -105,3 +105,43 @@ html, body {
 }
 
 #panel input[type="range"] { width: 180px; }
+
+#lockbar.hidden { display: none; }
+
+#lockbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  z-index: 20;
+}
+
+#status {
+  padding: 0.3rem 0.9rem;
+  font-size: 0.8rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+#lock-btn {
+  padding: 0.85rem 1.8rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #000;
+  background: #00e5ff;
+  border: none;
+  border-radius: 999px;
+}
+
+#lock-btn:disabled {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
