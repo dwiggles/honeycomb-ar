@@ -52,8 +52,10 @@ class PlaneTracker {
     this.procW = 0;
     this.procH = 0;
     this.procScale = 1;     // procPixels / videoPixels
-    this.minPts = 25;       // re-seed below this; lose tracking below 4
-    this.deadband = 0.8;    // proc px; below this the grid is frozen (stationary)
+    this.minPts = 25;        // re-seed below this; lose tracking below 4
+    this.deadband = 1.5;     // display px; below this the grid is frozen (stationary)
+    this.gateCorners = null; // visible screen corners in proc space (set by app.js)
+    this.gateScale = 1;      // proc px -> display px, for the freeze gate
 
     this.ref = [];          // reference points (plane coords)
     this.cur = [];          // their current tracked positions
@@ -122,23 +124,30 @@ class PlaneTracker {
   }
 
   // Adaptive smoothing factor, keyed off how far the grid moved on screen (d,
-  // in proc px). Just past the deadband: light blend. Big moves: snap to live.
+  // in display px). Just past the deadband: light blend. Big moves: snap to live.
   _alphaFor(d) {
-    const LO = this.deadband, HI = 4.0;
+    const LO = this.deadband, HI = 8.0;
     const A_MIN = 0.25, A_MAX = 1.0;
     if (d <= LO) return A_MIN;
     if (d >= HI) return A_MAX;
     return A_MIN + (A_MAX - A_MIN) * (d - LO) / (HI - LO);
   }
 
-  // Max on-screen displacement of the frame corners between two homographies.
-  // Corners are where peripheral wobble shows up most, so we gate on them.
+  // Max on-screen displacement (display px) between two homographies, measured
+  // at the visible screen corners (set via gateCorners) rather than the camera
+  // frame corners. The frame corners sit outside the tracked center region, so
+  // they're extrapolated and wobbly; the visible corners are well inside it and
+  // are the periphery the user actually sees.
   _visibleChange(hA, hB) {
-    const corners = [[0, 0], [this.procW, 0], [this.procW, this.procH], [0, this.procH]];
+    const pts = this.gateCorners || [
+      { x: 0, y: 0 }, { x: this.procW, y: 0 },
+      { x: this.procW, y: this.procH }, { x: 0, y: this.procH },
+    ];
+    const scale = this.gateCorners ? this.gateScale : 1;
     let m = 0;
-    for (const [x, y] of corners) {
-      const a = applyH(hA, x, y), b = applyH(hB, x, y);
-      m = Math.max(m, Math.hypot(a.x - b.x, a.y - b.y));
+    for (const p of pts) {
+      const a = applyH(hA, p.x, p.y), b = applyH(hB, p.x, p.y);
+      m = Math.max(m, Math.hypot(a.x - b.x, a.y - b.y) * scale);
     }
     return m;
   }

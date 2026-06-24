@@ -24,7 +24,7 @@ const settings = {
   color: '#00e5ff',
 };
 
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v7';
 
 const tracker = new PlaneTracker();
 let mode = 'screen';     // 'screen' (Phase 1) | 'locked' (Phase 2)
@@ -75,7 +75,7 @@ function resize() {
   canvas.style.width = window.innerWidth + 'px';
   canvas.style.height = window.innerHeight + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in display px
-  if (mode === 'locked') buildGridRef();
+  if (mode === 'locked') { setGate(); buildGridRef(); }
 }
 
 window.addEventListener('resize', resize);
@@ -96,6 +96,16 @@ function displayMapping() {
     dispW,
     dispH,
   };
+}
+
+// Tell the tracker which proc-space points are the visible screen corners, so
+// its freeze deadband gates on what the user actually sees at the periphery.
+function setGate() {
+  if (!tracker.procW) return;
+  const { factor, offX, offY, dispW, dispH } = displayMapping();
+  const toProc = (X, Y) => ({ x: (X - offX) / factor, y: (Y - offY) / factor });
+  tracker.gateCorners = [toProc(0, 0), toProc(dispW, 0), toProc(dispW, dispH), toProc(0, dispH)];
+  tracker.gateScale = factor;
 }
 
 // --- Honeycomb grids ------------------------------------------------------
@@ -210,6 +220,7 @@ lockBtn.addEventListener('click', () => {
     tracker.unlock();
     mode = 'screen';
     lockMap = null;
+    tracker.gateCorners = null;
     setStatus('Screen-locked');
     updateLockBtn();
     return;
@@ -217,6 +228,7 @@ lockBtn.addEventListener('click', () => {
   if (tracker.lock(video)) {
     mode = 'locked';
     lockMap = displayMapping();
+    setGate();
     buildGridRef();
     setStatus('Tracking surface');
   } else {
