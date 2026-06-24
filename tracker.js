@@ -11,7 +11,12 @@
 // PROC_WIDTH for speed. app.js maps proc space -> on-screen display space.
 
 const PROC_WIDTH = 360;
-const CENTER_ROI = 0.7; // detect features only in this central fraction of the frame
+const CENTER_ROI = 0.9;  // detect features across most of the frame (exclude only
+                         // the lens-distorted extreme corners)
+const HEAT_CELL = 20;    // occlusion-map cell size, proc px
+const HEAT_DECAY = 0.85; // per-frame fade of the occlusion map
+const HEAT_ADD = 1.0;    // heat added per outlier landing in a cell
+const HEAT_THRESH = 2.5; // cells at/above this are treated as occluded (hand/pen)
 
 // --- 3x3 homography helpers (row-major Float64Array) ----------------------
 
@@ -61,6 +66,10 @@ class PlaneTracker {
     this.cur = [];          // their current tracked positions
     this.prevGray = null;   // cv.Mat of previous frame (grayscale)
 
+    this.heat = null;       // occlusion map: where RANSAC outliers cluster (hand/pen)
+    this.heatCols = 0;
+    this.heatRows = 0;
+
     this.canvas = document.createElement('canvas');
     this.cctx = this.canvas.getContext('2d', { willReadFrequently: true });
   }
@@ -106,7 +115,8 @@ class PlaneTracker {
     if (!this.ready) return false;
     if (this.prevGray) { this.prevGray.delete(); this.prevGray = null; }
     const gray = this._grabGray(video);
-    const mask = this._centerMask();
+    this._initHeat();
+    const mask = this._detectionMask();
     const pts = this._detect(gray, 200, mask);
     mask.delete();
     if (pts.length < this.minPts) {
@@ -152,8 +162,10 @@ class PlaneTracker {
     return m;
   }
 
-  // Mask allowing feature detection only within a central ellipse — edge
-  // features are noisier and swing the far corners, so we exclude them.
+  // Wide elliptical ROI — allow features across most of the frame, excluding
+  // only the lens-distorted extreme corners. On a low-texture surface (rolled
+  // dough) the usable detail lives at the periphery: the surrounding table and
+  // the dough edge. The center is mostly smooth dough plus the drawing hand.
   _centerMask() {
     const mask = new cv.Mat(this.procH, this.procW, cv.CV_8UC1);
     mask.setTo(new cv.Scalar(0));
@@ -164,11 +176,52 @@ class PlaneTracker {
     return mask;
   }
 
+  // --- Occlusion map: learn where the hand/pen is, from tracking itself ------
+  // RANSAC outliers cluster on whatever moves differently from the surface —
+  // the hand and pen. We accumulate them into a coarse, decaying grid and stop
+  // seeding features in hot cells, so the occluder never contributes points.
+
+  _initHeat() {
+    this.heatCols = Math.ceil(this.procW / HEAT_CELL);
+    this.heatRows = Math.ceil(this.procH / HEAT_CELL);
+    this.heat = new Float32Array(this.heatCols * this.heatRows);
+  }
+
+  _decayHeat() {
+    if (!this.heat) return;
+    for (let i = 0; i < this.heat.length; i++) this.heat[i] *= HEAT_DECAY;
+  }
+
+  _addHeat(p) {
+    if (!this.heat) return;
+    const c = Math.min(this.heatCols - 1, Math.max(0, Math.floor(p.x / HEAT_CELL)));
+    const r = Math.min(this.heatRows - 1, Math.max(0, Math.floor(p.y / HEAT_CELL)));
+    this.heat[r * this.heatCols + c] += HEAT_ADD;
+  }
+
+  // Detection ROI minus the occluded (hot) cells.
+  _detectionMask() {
+    const mask = this._centerMask();
+    if (this.heat) {
+      for (let r = 0; r < this.heatRows; r++) {
+        for (let c = 0; c < this.heatCols; c++) {
+          if (this.heat[r * this.heatCols + c] >= HEAT_THRESH) {
+            const x0 = c * HEAT_CELL, y0 = r * HEAT_CELL;
+            cv.rectangle(mask, new cv.Point(x0, y0),
+              new cv.Point(x0 + HEAT_CELL, y0 + HEAT_CELL), new cv.Scalar(0), -1);
+          }
+        }
+      }
+    }
+    return mask;
+  }
+
   unlock() {
     this.tracking = false;
     if (this.prevGray) { this.prevGray.delete(); this.prevGray = null; }
     this.ref = [];
     this.cur = [];
+    this.heat = null;
   }
 
   // Advance tracking by one frame. Returns true while still tracking.
@@ -227,9 +280,15 @@ class PlaneTracker {
         // causing edge jitter that persists even at rest. Pruning them lets the
         // set reconverge so the jitter stops on its own.
         if (mask.rows === this.ref.length) {
+          this._decayHeat();
           const keepRef = [], keepCur = [];
           for (let k = 0; k < mask.rows; k++) {
-            if (mask.data[k]) { keepRef.push(this.ref[k]); keepCur.push(this.cur[k]); }
+            if (mask.data[k]) {
+              keepRef.push(this.ref[k]);
+              keepCur.push(this.cur[k]);
+            } else {
+              this._addHeat(this.cur[k]); // outlier -> occluder (hand/pen)
+            }
           }
           if (keepRef.length >= 8) { this.ref = keepRef; this.cur = keepCur; }
         }
@@ -241,7 +300,7 @@ class PlaneTracker {
     if (this.cur.length < this.minPts) {
       const Hinv = invert3(this.rawH);
       if (Hinv) {
-        const mask = this._centerMask();
+        const mask = this._detectionMask(); // wide ROI minus the hand/pen cells
         for (const p of this.cur) {
           cv.circle(mask, new cv.Point(Math.round(p.x), Math.round(p.y)), 10, new cv.Scalar(0), -1);
         }

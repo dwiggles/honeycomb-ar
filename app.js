@@ -24,7 +24,7 @@ const settings = {
   color: '#00e5ff',
 };
 
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 
 const tracker = new PlaneTracker();
 let mode = 'screen';     // 'screen' (Phase 1) | 'locked' (Phase 2)
@@ -232,7 +232,7 @@ lockBtn.addEventListener('click', () => {
     buildGridRef();
     setStatus('Tracking surface');
   } else {
-    setStatus('Not enough texture — aim at a detailed surface');
+    setStatus('Not enough texture — scatter a few small objects (raisins, a spoon) around the dough and try again');
   }
   updateLockBtn();
 });
@@ -277,5 +277,5 @@ function whenOpenCvReady(cb) {
 whenOpenCvReady(() => {
   tracker.ready = true;
   updateLockBtn();
-  if (mode !== 'locked') setStatus('Ready — tap Lock to surface');
+  if (mode !== 'locked') setStatus('Frame the whole dough, then Lock');
 });
