@@ -50,6 +50,7 @@ html, body {
 #start-screen h1 { font-size: 2rem; letter-spacing: 0.5px; }
 #start-screen p { max-width: 28ch; opacity: 0.75; line-height: 1.5; }
 .hint { font-size: 0.85rem; color: #ff6b6b; min-height: 1.2em; }
+.version { font-size: 0.8rem; color: #00e5ff; opacity: 0.6; letter-spacing: 1px; }
 
 #start-btn {
   margin-top: 0.5rem;

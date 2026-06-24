@@ -24,9 +24,12 @@ const settings = {
   color: '#00e5ff',
 };
 
+const APP_VERSION = 'v6';
+
 const tracker = new PlaneTracker();
 let mode = 'screen';     // 'screen' (Phase 1) | 'locked' (Phase 2)
 let gridRef = [];        // honeycomb points in tracker proc/plane space
+let lockMap = null;      // proc<->display mapping captured at lock time
 
 // --- Camera ---------------------------------------------------------------
 
@@ -117,23 +120,32 @@ function drawScreen() {
   }
 }
 
-// Build the honeycomb in tracker proc/plane space, covering the locked frame
-// plus a margin so dots appear as you pan onto new parts of the surface.
+// Build the honeycomb as plane (proc) coordinates. We lay out the exact same
+// lattice drawScreen() uses — same -spacing phase, same row parity — extended
+// past the screen by a margin, then map each display point back through the
+// lock-time mapping. At lock (H = identity) this reproduces the on-screen grid
+// pixel-for-pixel, so locking causes no jump; tracking then moves it as one.
 function buildGridRef() {
   gridRef = [];
-  if (!tracker.procW) return;
-  const { factor } = displayMapping();
-  const sProc = settings.spacing / factor; // display spacing -> proc spacing
-  if (!(sProc > 0)) return;
-  const rowH = sProc * Math.sqrt(3) / 2;
+  if (!tracker.procW || !lockMap) return;
+  const s = settings.spacing;
+  if (!(s > 0)) return;
+  const rowH = s * Math.sqrt(3) / 2;
+  const W = window.innerWidth, Hh = window.innerHeight;
   const margin = 0.6;
-  const x0 = -tracker.procW * margin, x1 = tracker.procW * (1 + margin);
-  const y0 = -tracker.procH * margin, y1 = tracker.procH * (1 + margin);
-  let row = 0;
-  for (let y = y0; y <= y1; y += rowH) {
-    const off = (row % 2) * (sProc / 2);
-    for (let x = x0; x <= x1; x += sProc) gridRef.push({ x: x + off, y });
-    row++;
+  const yStart = -s - Math.ceil((margin * Hh) / rowH) * rowH;
+  const xStart = -s - Math.ceil((margin * W) / s) * s;
+  const yEnd = Hh + s + margin * Hh;
+  const xEnd = W + s + margin * W;
+  for (let yd = yStart; yd <= yEnd; yd += rowH) {
+    const row = Math.round((yd + s) / rowH);
+    const off = (((row % 2) + 2) % 2) * (s / 2); // match drawScreen row parity
+    for (let xd = xStart; xd <= xEnd; xd += s) {
+      gridRef.push({
+        x: (xd + off - lockMap.offX) / lockMap.factor,
+        y: (yd - lockMap.offY) / lockMap.factor,
+      });
+    }
   }
 }
 
@@ -197,12 +209,14 @@ lockBtn.addEventListener('click', () => {
   if (mode === 'locked') {
     tracker.unlock();
     mode = 'screen';
+    lockMap = null;
     setStatus('Screen-locked');
     updateLockBtn();
     return;
   }
   if (tracker.lock(video)) {
     mode = 'locked';
+    lockMap = displayMapping();
     buildGridRef();
     setStatus('Tracking surface');
   } else {
@@ -231,6 +245,8 @@ document.getElementById('opacity').addEventListener('input', (e) => {
 document.getElementById('color').addEventListener('input', (e) => {
   settings.color = e.target.value;
 });
+
+document.getElementById('version').textContent = APP_VERSION;
 
 startBtn.addEventListener('click', startCamera);
 

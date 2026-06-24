@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Honeycomb AR</title>
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <div id="stage">
@@ -18,6 +18,7 @@
     <p>Point your camera at a surface. We'll overlay a honeycomb grid of dots.</p>
     <button id="start-btn">Start camera</button>
     <p class="hint" id="error-msg"></p>
+    <p class="version" id="version">…</p>
   </div>
 
   <div id="lockbar" class="hidden">
@@ -47,7 +48,7 @@
   </div>
 
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-  <script src="tracker.js?v=5"></script>
-  <script src="app.js?v=5"></script>
+  <script src="tracker.js?v=6"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
